@@ -1,7 +1,9 @@
 Flask>=3.0,<4
 astropy
+astropy-healpix
 matplotlib
 numpy
 Pillow
+photutils
 scipy
 reproject

@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SPHEREx Sky Time-Lapse</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261114-25') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261114-a11y') }}">
 </head>
 <body>
-  <main class="page">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <main class="page" id="main-content" tabindex="-1">
     <header>
       <p class="eyebrow">NASA SPHEREx · Hackathon prototype</p>
       <h1>Sky Time-Lapse Viewer</h1>
@@ -19,7 +20,8 @@
         <div><p class="step">Step 1</p><h2>Select a sky position</h2></div>
         <p>Scroll to zoom · drag to move · click to select</p>
       </div>
-      <div class="sky-viewport all-sky-map" data-sky-viewport>
+      <p class="sr-only" id="sky-map-help">Use the map with a pointer, or enter Right Ascension and Declination manually in step 2.</p>
+      <div class="sky-viewport all-sky-map" data-sky-viewport aria-label="Interactive full-sky SPHEREx map" aria-describedby="sky-map-help">
         <div id="spherex-all-sky" class="aladin-map" data-aladin-map></div>
         <div class="sky-layer" data-sky-layer hidden>
           <img src="{{ url_for('static', filename='vendor/spherex/allsky-channel-2.png', v='dr1') }}" alt="SPHEREx DR1 full-sky HEALPix tile atlas" draggable="false" data-sky-image>
@@ -33,9 +35,9 @@
         <div class="map-help" data-map-help>Click a sky tile to select it</div>
       </div>
       <div class="map-actions">
-        <button type="button" class="secondary" data-zoom-out aria-label="Zoom out">−</button>
+        <button type="button" class="secondary zoom-button" data-zoom-out aria-label="Zoom out of the sky map">−</button>
         <button type="button" class="secondary" data-reset-view>Reset view</button>
-        <button type="button" class="secondary" data-zoom-in aria-label="Zoom in">+</button>
+        <button type="button" class="secondary zoom-button" data-zoom-in aria-label="Zoom in to the sky map">+</button>
         <label class="channel-control">Spectral channel
           <select data-sky-channel data-channel-url="/all-sky/channel/{channel}.png"></select>
         </label>
@@ -81,7 +83,7 @@
           <input name="to_date" data-to-date type="date">
         </label>
         <button type="button" data-search-observations>Find current data</button>
-        <div class="archive-status" data-archive-status>Select a sky position, then search the live IRSA archive.</div>
+        <div class="archive-status" data-archive-status role="status" aria-live="polite" aria-atomic="true">Select a sky position, then search the live IRSA archive.</div>
         <div class="observation-range">
           <label>From observation
             <select name="start_id" data-start-date required disabled><option value="">Search first</option></select>
@@ -94,14 +96,14 @@
           <input name="sigma_threshold" data-sigma-threshold type="range" min="3" max="10" step="0.5" value="5">
         </label>
         <button type="submit" data-generate disabled>Generate time-lapse</button>
-        <div class="generate-status" data-generate-status aria-live="polite"></div>
+        <div class="generate-status" data-generate-status role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="range-note">Only the two specifically selected From and To observations are downloaded and processed. Intermediate dates are never included.</div>
       </form>
       <p class="hint">Offline demo: enter 999999 in both RA and Dec to use the two downloaded D5 FITS files. Real dataset center: RA 133.805°, Dec −8.770°.</p>
       {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
     </section>
 
-    <div data-result-mount aria-live="polite">
+    <div data-result-mount aria-live="polite" aria-relevant="additions">
     {% if result %}
     <section class="viewer" data-viewer>
       <div class="image-stage">
@@ -122,10 +124,10 @@
         <button type="button" data-action="next">Next</button>
       </div>
 
-      <div class="timeline" aria-label="Observation timeline">
+      <div class="timeline" role="group" aria-label="Observation timeline">
         {% for observation in result.observations %}
         <button type="button" class="timeline-point{% if loop.first %} active{% endif %}" data-index="{{ loop.index0 }}">
-          <span></span>{{ observation.date|greek_date }}
+          <span aria-hidden="true"></span>{{ observation.date|greek_date }}
         </button>
         {% endfor %}
       </div>
@@ -230,6 +232,6 @@
     window.A = A;
     window.dispatchEvent(new Event("aladin-ready"));
   </script>
-  <script src="{{ url_for('static', filename='viewer.js', v='20261114-25') }}"></script>
+  <script src="{{ url_for('static', filename='viewer.js', v='20261114-a11y') }}"></script>
 </body>
 </html>

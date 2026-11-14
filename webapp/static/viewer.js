@@ -330,7 +330,8 @@ if (archiveForm) {
       const newViewer = currentMount.querySelector("[data-viewer]");
       initializeViewer(newViewer);
       generateStatus.textContent = "Time-lapse ready. The results are displayed below.";
-      newViewer.scrollIntoView({behavior: "smooth", block: "start"});
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      newViewer.scrollIntoView({behavior: reducedMotion ? "auto" : "smooth", block: "start"});
     } catch (error) {
       generateStatus.textContent = error.message;
     } finally {
@@ -350,30 +351,47 @@ function initializeViewer(viewer) {
   const frames = [...viewer.querySelectorAll(".frame")];
   const points = [...viewer.querySelectorAll(".timeline-point")];
   const dateLabel = viewer.querySelector("#current-date");
+  const playButton = viewer.querySelector('[data-action="play"]');
+  const pauseButton = viewer.querySelector('[data-action="pause"]');
   let current = 0;
   let timer = null;
 
   function show(index) {
     current = (index + frames.length) % frames.length;
-    frames.forEach((frame, i) => frame.classList.toggle("active", i === current));
-    points.forEach((point, i) => point.classList.toggle("active", i === current));
+    frames.forEach((frame, i) => {
+      const active = i === current;
+      frame.classList.toggle("active", active);
+      frame.setAttribute("aria-hidden", String(!active));
+    });
+    points.forEach((point, i) => {
+      const active = i === current;
+      point.classList.toggle("active", active);
+      if (active) point.setAttribute("aria-current", "date");
+      else point.removeAttribute("aria-current");
+    });
     dateLabel.textContent = frames[current].dataset.date;
   }
 
   function pause() {
     window.clearInterval(timer);
     timer = null;
+    playButton.setAttribute("aria-pressed", "false");
+    pauseButton.setAttribute("aria-pressed", "true");
   }
 
   function play() {
-    if (!timer) timer = window.setInterval(() => show(current + 1), 900);
+    if (!timer) timer = window.setInterval(() => show(current + 1), 1200);
+    playButton.setAttribute("aria-pressed", "true");
+    pauseButton.setAttribute("aria-pressed", "false");
   }
 
   viewer.querySelector('[data-action="previous"]').addEventListener("click", () => show(current - 1));
   viewer.querySelector('[data-action="next"]').addEventListener("click", () => show(current + 1));
-  viewer.querySelector('[data-action="play"]').addEventListener("click", play);
-  viewer.querySelector('[data-action="pause"]').addEventListener("click", pause);
+  playButton.addEventListener("click", play);
+  pauseButton.addEventListener("click", pause);
   points.forEach((point) => point.addEventListener("click", () => { pause(); show(Number(point.dataset.index)); }));
+  pause();
+  show(0);
 }
 
 initializeViewer(document.querySelector("[data-viewer]"));
