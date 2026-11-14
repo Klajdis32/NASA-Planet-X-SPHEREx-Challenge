@@ -51,8 +51,8 @@ month, three months, or year; custom From/To dates remain available.
 
 Internet access is required for the first search and first use of each cutout.
 Cached cutouts live in `data/cache/spherex_cutouts/`. The archive search returns
-up to 5,000 matching observations; animations intentionally use at most 24 evenly
-spaced frames to keep this local hackathon viewer responsive.
+up to 5,000 matching observations. Each animation processes only the two
+explicitly selected From and To observations; intermediate dates are not used.
 
 If an individual IRSA cutout is temporarily unavailable, it is retried once and
 then skipped. The animation continues with the remaining frames as long as at
@@ -71,4 +71,6 @@ The existing command still works:
 python processing/sky_cutout.py --ra 133.805 --dec -8.770 --size 128
 ```
 
-Valid ranges are RA `[0, 360)`, Dec `[-90, 90]`, and size `16`–`1024` pixels.
+Valid scientific ranges are RA `[0, 360)`, Dec `[-90, 90]`, and size
+`16`–`1024` pixels. Entering `999999` in both coordinate fields activates the
+two-file local D5 demo at RA 133.805°, Dec −8.770°.

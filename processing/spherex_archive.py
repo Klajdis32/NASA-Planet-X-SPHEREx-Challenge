@@ -3,6 +3,7 @@
 import csv
 import hashlib
 import io
+import math
 from pathlib import Path
 import time
 from urllib.error import HTTPError, URLError
@@ -16,6 +17,7 @@ TAP_URL = "https://irsa.ipac.caltech.edu/TAP/sync"
 IRSA_BASE_URL = "https://irsa.ipac.caltech.edu/"
 BANDS = tuple(f"SPHEREx-D{number}" for number in range(1, 7))
 MAX_RESULTS = 5000
+LOCAL_CATALOG = Path(__file__).resolve().parent.parent / "spherex_observations.csv"
 CURRENT_COLLECTIONS = (
     "spherex_dr1",
     "spherex_dr1_deep",
@@ -109,6 +111,59 @@ def search_observations(
     unique = {}
     for row in rows:
         unique[(row["uri"], row["mjd"])] = row
+    return sorted(unique.values(), key=lambda item: item["mjd"])
+
+
+def search_local_catalog(ra, dec, band="SPHEREx-D5", start_mjd=None, end_mjd=None):
+    """Search the saved SIA snapshot when the live IRSA proxy is unavailable."""
+    ra, dec = _validate_position(ra, dec)
+    if band not in BANDS:
+        raise ValueError(f"Unsupported SPHEREx band: {band}")
+    if not LOCAL_CATALOG.is_file():
+        return []
+
+    def separation_deg(ra1, dec1, ra2, dec2):
+        ra1, dec1, ra2, dec2 = map(math.radians, (ra1, dec1, ra2, dec2))
+        cosine = (
+            math.sin(dec1) * math.sin(dec2)
+            + math.cos(dec1) * math.cos(dec2) * math.cos(ra1 - ra2)
+        )
+        return math.degrees(math.acos(max(-1.0, min(1.0, cosine))))
+
+    rows = []
+    with LOCAL_CATALOG.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("energy_bandpassname") != band:
+                continue
+            try:
+                mjd = float(row["t_min"])
+                center_ra = float(row["s_ra"])
+                center_dec = float(row["s_dec"])
+                radius = float(row.get("s_fov") or 3.48) / 2 + 0.15
+            except (TypeError, ValueError, KeyError):
+                continue
+            if start_mjd is not None and mjd < float(start_mjd):
+                continue
+            if end_mjd is not None and mjd >= float(end_mjd):
+                continue
+            if separation_deg(ra, dec, center_ra, center_dec) > radius:
+                continue
+            access_url = row.get("access_url", "")
+            marker = "irsa.ipac.caltech.edu/"
+            uri = access_url.split(marker, 1)[-1] if marker in access_url else ""
+            if not uri.startswith("ibe/data/spherex/"):
+                continue
+            rows.append({
+                "id": hashlib.sha256(uri.encode()).hexdigest()[:16],
+                "uri": uri,
+                "mjd": mjd,
+                "date": Time(mjd, format="mjd").isot,
+                "band": band,
+                "version": "local-catalog",
+                "collection": row.get("obs_collection", "spherex_dr1"),
+                "filename": Path(uri).name,
+            })
+    unique = {(row["uri"], row["mjd"]): row for row in rows}
     return sorted(unique.values(), key=lambda item: item["mjd"])
 
 

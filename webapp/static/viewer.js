@@ -1,8 +1,19 @@
-const viewer = document.querySelector("[data-viewer]");
 const picker = document.querySelector("[data-sky-picker]");
 const archiveForm = document.querySelector("[data-archive-form]");
 const sigmaInput = document.querySelector("[data-sigma-threshold]");
 const sigmaValue = document.querySelector("[data-sigma-value]");
+const statusLoaderUrl = "/static/vendor/ui/loading-green.gif?v=2";
+
+function showLoadingStatus(element, message) {
+  const image = document.createElement("img");
+  image.src = statusLoaderUrl;
+  image.alt = "";
+  image.className = "status-loader-gif";
+  const text = document.createElement("span");
+  text.textContent = message;
+  element.replaceChildren(image, text);
+  element.classList.add("loading");
+}
 
 if (sigmaInput && sigmaValue) {
   sigmaInput.addEventListener("input", () => { sigmaValue.textContent = `${Number(sigmaInput.value).toFixed(1)}σ`; });
@@ -15,6 +26,7 @@ if (picker) {
   const image = picker.querySelector("[data-sky-image]");
   const marker = picker.querySelector("[data-selection-box]");
   const channelSelect = picker.querySelector("[data-sky-channel]");
+  const loadingOverlay = picker.querySelector("[data-map-loading]");
   const help = picker.querySelector("[data-map-help]");
   const raInput = document.querySelector("[data-ra-input]");
   const decInput = document.querySelector("[data-dec-input]");
@@ -41,6 +53,7 @@ if (picker) {
     atlasMode = true;
     aladinElement.hidden = true;
     layer.hidden = false;
+    loadingOverlay.hidden = true;
     help.textContent = "WebGL2 unavailable · using selectable HEALPix tile atlas";
   }
 
@@ -55,7 +68,7 @@ if (picker) {
     return true;
   }
 
-  for (let channel = 1; channel <= 102; channel += 1) {
+  for (let channel = 2; channel <= 102; channel += 1) {
     const option = document.createElement("option");
     const detector = Math.ceil(channel / 17);
     const detectorChannel = ((channel - 1) % 17) + 1;
@@ -168,6 +181,7 @@ if (picker) {
       hipsLayer = window.A.imageHiPS(picker.dataset.hipsUrl, {
         successCallback: () => {
           showCubeChannel(channelSelect.value);
+          loadingOverlay.hidden = true;
           help.textContent = `Continuous Aitoff map · channel ${channelSelect.value}/102`;
         },
       });
@@ -198,12 +212,18 @@ if (archiveForm) {
   const searchButton = archiveForm.querySelector("[data-search-observations]");
   const generateButton = archiveForm.querySelector("[data-generate]");
   const status = archiveForm.querySelector("[data-archive-status]");
+  const generateStatus = archiveForm.querySelector("[data-generate-status]");
 
   function formatLocalDate(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  }
+
+  function formatGreekDate(value) {
+    const [year, month, day] = String(value).slice(0, 10).split("-");
+    return year && month && day ? `${day}/${month}/${year}` : value;
   }
 
   function applyQuickPeriod() {
@@ -222,6 +242,8 @@ if (archiveForm) {
       toDateInput.value = formatLocalDate(toDate);
     }
     generateButton.disabled = true;
+    generateStatus.textContent = "";
+    generateStatus.classList.remove("loading");
     status.textContent = allData
       ? "All current DR1 + QR3 dates will be searched."
       : "Period changed — search the archive again.";
@@ -232,7 +254,7 @@ if (archiveForm) {
     observations.forEach((observation, index) => {
       const option = document.createElement("option");
       option.value = observation.id;
-      option.textContent = `${observation.date.slice(0, 19)} · ${observation.collection} · pipeline ${observation.version}`;
+      option.textContent = `${formatGreekDate(observation.date)} · ${observation.collection} · pipeline ${observation.version}`;
       option.selected = index === selectedIndex;
       select.append(option);
     });
@@ -242,7 +264,9 @@ if (archiveForm) {
   async function searchArchive() {
     searchButton.disabled = true;
     generateButton.disabled = true;
-    status.textContent = "Searching the current NASA/IPAC archive…";
+    generateStatus.textContent = "";
+    generateStatus.classList.remove("loading");
+    showLoadingStatus(status, "Searching the current NASA/IPAC archive…");
     const params = new URLSearchParams({
       ra: raInput.value,
       dec: decInput.value,
@@ -258,9 +282,15 @@ if (archiveForm) {
       const rangeStart = 0;
       fillSelect(startSelect, data.observations, rangeStart);
       fillSelect(endSelect, data.observations, data.observations.length - 1);
-      const first = data.observations[rangeStart].date.slice(0, 10);
-      const last = data.observations.at(-1).date.slice(0, 10);
-      status.textContent = `${data.count} current observations found${data.cache_hit ? " (cached search)" : ""}, from ${first} to ${last}. All are available in the From/To selectors${data.truncated ? " (first 5,000 shown)" : ""}.`;
+      const first = formatGreekDate(data.observations[rangeStart].date);
+      const last = formatGreekDate(data.observations.at(-1).date);
+      let sourceNote = "";
+      if (data.source === "local catalog fallback") {
+        sourceNote = " Local catalog fallback is active because the live IRSA proxy is unavailable.";
+      } else if (data.source === "local demo files") {
+        sourceNote = " Offline demo active: using the two downloaded D5 FITS files at RA 133.805°, Dec −8.770°.";
+      }
+      status.textContent = `${data.count} current observations found${data.cache_hit ? " (cached search)" : ""}, from ${first} to ${last}. All are available in the From/To selectors${data.truncated ? " (first 5,000 shown)" : ""}.${sourceNote}`;
       generateButton.disabled = false;
     } catch (error) {
       status.textContent = error.message;
@@ -268,6 +298,7 @@ if (archiveForm) {
       endSelect.disabled = true;
     } finally {
       searchButton.disabled = false;
+      status.classList.remove("loading");
     }
   }
 
@@ -275,10 +306,38 @@ if (archiveForm) {
   periodInput.addEventListener("change", applyQuickPeriod);
   fromDateInput.addEventListener("change", () => { generateButton.disabled = true; });
   toDateInput.addEventListener("change", () => { generateButton.disabled = true; });
-  archiveForm.addEventListener("submit", () => {
+  archiveForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const originalLabel = generateButton.textContent;
     generateButton.disabled = true;
     generateButton.textContent = "Downloading available frames…";
-    status.textContent = "Building the time-lapse. Unavailable IRSA frames will be skipped automatically.";
+    showLoadingStatus(generateStatus, "Generating the time-lapse… downloading and analysing available frames.");
+    try {
+      const response = await fetch(archiveForm.action, {
+        method: "POST",
+        body: new FormData(archiveForm),
+        headers: {"X-Requested-With": "fetch"},
+      });
+      const html = await response.text();
+      const page = new DOMParser().parseFromString(html, "text/html");
+      const incomingMount = page.querySelector("[data-result-mount]");
+      const currentMount = document.querySelector("[data-result-mount]");
+      const returnedError = page.querySelector(".error");
+      if (!response.ok || !incomingMount || !incomingMount.querySelector("[data-viewer]")) {
+        throw new Error(returnedError?.textContent?.trim() || "The time-lapse could not be generated.");
+      }
+      currentMount.innerHTML = incomingMount.innerHTML;
+      const newViewer = currentMount.querySelector("[data-viewer]");
+      initializeViewer(newViewer);
+      generateStatus.textContent = "Time-lapse ready. The results are displayed below.";
+      newViewer.scrollIntoView({behavior: "smooth", block: "start"});
+    } catch (error) {
+      generateStatus.textContent = error.message;
+    } finally {
+      generateButton.textContent = originalLabel;
+      generateButton.disabled = startSelect.disabled || endSelect.disabled;
+      generateStatus.classList.remove("loading");
+    }
   });
   bandInput.addEventListener("change", () => { generateButton.disabled = true; status.textContent = "Band changed — search again."; });
   raInput.addEventListener("change", () => { generateButton.disabled = true; });
@@ -286,7 +345,8 @@ if (archiveForm) {
   applyQuickPeriod();
 }
 
-if (viewer) {
+function initializeViewer(viewer) {
+  if (!viewer) return;
   const frames = [...viewer.querySelectorAll(".frame")];
   const points = [...viewer.querySelectorAll(".timeline-point")];
   const dateLabel = viewer.querySelector("#current-date");
@@ -315,3 +375,5 @@ if (viewer) {
   viewer.querySelector('[data-action="pause"]').addEventListener("click", pause);
   points.forEach((point) => point.addEventListener("click", () => { pause(); show(Number(point.dataset.index)); }));
 }
+
+initializeViewer(document.querySelector("[data-viewer]"));

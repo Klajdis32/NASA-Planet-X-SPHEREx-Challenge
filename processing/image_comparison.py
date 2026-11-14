@@ -178,12 +178,15 @@ def compare_images(data1, data2, wavelength_tolerance=0.005):
         image1.shape, np.nan, dtype=np.float32
     )
 
-    combined_variance = (
+    combined_variance = np.full(
+        image1.shape, np.nan, dtype=np.float32
+    )
+    combined_variance[valid] = (
         variance1[valid] + aligned_variance2[valid]
     )
 
     significance[valid] = (
-        difference[valid] / np.sqrt(combined_variance)
+        difference[valid] / np.sqrt(combined_variance[valid])
     )
 
     return {
@@ -191,6 +194,7 @@ def compare_images(data1, data2, wavelength_tolerance=0.005):
         "aligned_image2": aligned_image2,
         "difference": difference,
         "significance": significance,
+        "combined_variance": combined_variance,
         "valid_mask": valid,
         "spectral_difference": spectral_difference,
     }

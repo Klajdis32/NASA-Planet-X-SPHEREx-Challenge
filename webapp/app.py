@@ -9,6 +9,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from astropy.time import Time
+from astropy.io import fits
 from astropy import units as u
 from astropy_healpix import HEALPix
 from uuid import uuid4
@@ -32,8 +33,8 @@ from processing.spherex_archive import (  # noqa: E402
     ArchiveError,
     BANDS,
     download_cutout,
+    search_local_catalog,
     search_observations,
-    select_time_range,
 )
 from scientific_comparison import run_scientific_comparison  # noqa: E402
 
@@ -49,9 +50,43 @@ ALL_SKY_ROWS = 29
 ALL_SKY_TILE_COUNT = 12 * (4 ** ALL_SKY_ORDER)
 _all_sky_healpix = HEALPix(nside=2 ** ALL_SKY_ORDER, order="nested", frame="icrs")
 ALL_SKY_HIPS_ROOT = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube"
+DEMO_SENTINEL = 999999.0
+DEMO_RA = 133.805
+DEMO_DEC = -8.770
+DEMO_FILES = (
+    BASE_DIR / "data" / "raw" / "level2_2025W19_1B_0181_3D5_spx_l2b-v27-2026-197.fits",
+    BASE_DIR / "data" / "raw" / "level2_2026W20_1A_1166_1D5_spx_l2b-v27-2026-246.fits",
+)
+
+
+def local_demo_observations():
+    observations = []
+    for index, path in enumerate(DEMO_FILES):
+        if not path.is_file():
+            continue
+        with fits.open(path, memmap=True) as hdul:
+            header = hdul["IMAGE"].header
+            date = header.get("DATE-OBS")
+        if not date:
+            continue
+        mjd = float(Time(date).mjd)
+        observations.append({
+            "id": f"local-demo-{index + 1}",
+            "uri": "",
+            "local_path": str(path),
+            "mjd": mjd,
+            "date": Time(mjd, format="mjd").isot,
+            "band": "SPHEREx-D5",
+            "version": "local-file",
+            "collection": "local_demo",
+            "filename": path.name,
+        })
+    return sorted(observations, key=lambda item: item["mjd"])
 
 
 def cached_observation_search(ra, dec, band, from_date=None, to_date=None):
+    if float(ra) == DEMO_SENTINEL and float(dec) == DEMO_SENTINEL:
+        return local_demo_observations(), False, "local demo files"
     start_mjd = float(Time(from_date).mjd) if from_date else None
     # Include the complete To date by querying up to the following midnight.
     end_mjd = float(Time(to_date).mjd) + 1 if to_date else None
@@ -63,13 +98,22 @@ def cached_observation_search(ra, dec, band, from_date=None, to_date=None):
     with _search_cache_lock:
         cached = _search_cache.get(key)
         if cached and now - cached[0] < SEARCH_CACHE_TTL:
-            return cached[1], True
-    observations = search_observations(
-        ra, dec, band, start_mjd=start_mjd, end_mjd=end_mjd
-    )
+            return cached[1], True, cached[2]
+    source = "live IRSA"
+    try:
+        observations = search_observations(
+            ra, dec, band, start_mjd=start_mjd, end_mjd=end_mjd
+        )
+    except ArchiveError:
+        observations = search_local_catalog(
+            ra, dec, band, start_mjd=start_mjd, end_mjd=end_mjd
+        )
+        if not observations:
+            raise
+        source = "local catalog fallback"
     with _search_cache_lock:
-        _search_cache[key] = (now, observations)
-    return observations, False
+        _search_cache[key] = (now, observations, source)
+    return observations, False, source
 
 
 def create_app(test_config=None):
@@ -81,6 +125,14 @@ def create_app(test_config=None):
     )
     if test_config:
         app.config.update(test_config)
+
+    @app.template_filter("greek_date")
+    def greek_date(value):
+        try:
+            year, month, day = str(value)[:10].split("-")
+            return f"{day}/{month}/{year}"
+        except (TypeError, ValueError):
+            return str(value)
 
     @app.after_request
     def disable_browser_cache(response):
@@ -148,14 +200,8 @@ def create_app(test_config=None):
     @app.get("/all-sky/channel/<int:channel>.png")
     def all_sky_channel(channel):
         """Cache and serve one lightweight overview frame of the 102-plane cube."""
-        if not 1 <= channel <= 102:
+        if not 2 <= channel <= 102:
             abort(404)
-        if channel == 1:
-            return send_from_directory(
-                BASE_DIR / "webapp" / "static" / "vendor" / "spherex",
-                "allsky-channel-1.png",
-                max_age=86400,
-            )
         cache_dir = Path(app.config["ARCHIVE_CACHE"]) / "all_sky_channels"
         cache_dir.mkdir(parents=True, exist_ok=True)
         target = cache_dir / f"channel-{channel}.png"
@@ -188,7 +234,7 @@ def create_app(test_config=None):
                 raise ValueError("Choose both From and To, or leave both empty for all data.")
             if from_date and from_date > to_date:
                 raise ValueError("Choose a valid From/To date period.")
-            observations, cache_hit = cached_observation_search(
+            observations, cache_hit, source = cached_observation_search(
                 ra, dec, band, from_date, to_date
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -196,10 +242,14 @@ def create_app(test_config=None):
         except ArchiveError as exc:
             return jsonify(error=str(exc)), 502
         return jsonify(
-            observations=observations,
+            observations=[
+                {key: value for key, value in item.items() if key != "local_path"}
+                for item in observations
+            ],
             count=len(observations),
             truncated=len(observations) == 5000,
             cache_hit=cache_hit,
+            source=source,
         )
 
     @app.post("/generate")
@@ -220,6 +270,11 @@ def create_app(test_config=None):
         try:
             ra = float(values["ra"])
             dec = float(values["dec"])
+            demo_mode = ra == DEMO_SENTINEL and dec == DEMO_SENTINEL
+            effective_ra = DEMO_RA if demo_mode else ra
+            effective_dec = DEMO_DEC if demo_mode else dec
+            if demo_mode:
+                values["band"] = "SPHEREx-D5"
             size = int(values["size"])
             sigma_threshold = float(values["sigma_threshold"])
             if not 3 <= sigma_threshold <= 10:
@@ -233,26 +288,35 @@ def create_app(test_config=None):
             ), 400
 
         try:
-            available, search_cache_hit = cached_observation_search(
+            available, search_cache_hit, search_source = cached_observation_search(
                 ra, dec, values["band"], values["from_date"], values["to_date"]
             )
             if not available:
                 raise RuntimeError("No current IRSA observations cover this position and band.")
             start_id = values["start_id"] or available[0]["id"]
             end_id = values["end_id"] or available[-1]["id"]
-            selected = select_time_range(
-                available, start_id, end_id, int(values["max_frames"])
+            by_id = {item["id"]: item for item in available}
+            if start_id not in by_id or end_id not in by_id:
+                raise ValueError("The selected observations are no longer available.")
+            if start_id == end_id:
+                raise ValueError("Choose two different From and To observations.")
+            selected = sorted(
+                [by_id[start_id], by_id[end_id]],
+                key=lambda item: item["mjd"],
             )
             job_id = uuid4().hex
             job_dir = Path(app.config["OUTPUT_ROOT"]) / job_id
             def fetch_cutout(observation):
                 try:
+                    if observation.get("local_path"):
+                        return Path(observation["local_path"])
                     return download_cutout(
                         observation,
-                        ra,
-                        dec,
+                        effective_ra,
+                        effective_dec,
                         size,
                         app.config["ARCHIVE_CACHE"],
+                        timeout=60,
                         max_attempts=2,
                     )
                 except ArchiveError as exc:
@@ -278,12 +342,18 @@ def create_app(test_config=None):
 
             if len(cutout_files) < 2:
                 raise RuntimeError(
-                    "Fewer than two observations could be downloaded. "
-                    "IRSA may be temporarily busy; try a smaller date range shortly."
+                    "One of the two specifically selected observations could not be "
+                    "loaded. No intermediate or alternative observation was used."
                 )
+            paired = sorted(
+                zip(usable_observations, cutout_files),
+                key=lambda pair: pair[0]["mjd"],
+            )
+            usable_observations = [pair[0] for pair in paired]
+            cutout_files = [pair[1] for pair in paired]
             metadata = generate_cutouts(
-                ra,
-                dec,
+                effective_ra,
+                effective_dec,
                 size,
                 job_dir,
                 files=cutout_files,
@@ -296,6 +366,8 @@ def create_app(test_config=None):
             metadata["skipped_observations"] = skipped_observations
             metadata["band"] = values["band"]
             metadata["search_cache_hit"] = search_cache_hit
+            metadata["search_source"] = search_source
+            metadata["demo_mode"] = demo_mode
             terminal_buffer = StringIO()
             with redirect_stdout(terminal_buffer):
                 scientific = run_scientific_comparison(

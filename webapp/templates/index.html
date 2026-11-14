@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SPHEREx Sky Time-Lapse</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261114-12') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261114-25') }}">
 </head>
 <body>
   <main class="page">
@@ -22,10 +22,14 @@
       <div class="sky-viewport all-sky-map" data-sky-viewport>
         <div id="spherex-all-sky" class="aladin-map" data-aladin-map></div>
         <div class="sky-layer" data-sky-layer hidden>
-          <img src="{{ url_for('static', filename='vendor/spherex/allsky-channel-1.png', v='dr1') }}" alt="SPHEREx DR1 full-sky HEALPix tile atlas" draggable="false" data-sky-image>
+          <img src="{{ url_for('static', filename='vendor/spherex/allsky-channel-2.png', v='dr1') }}" alt="SPHEREx DR1 full-sky HEALPix tile atlas" draggable="false" data-sky-image>
           <div class="selection-box" data-selection-box aria-hidden="true"></div>
         </div>
-        <div class="map-badge">SPHEREx DR1 · complete HEALPix sky atlas · channel 1/102</div>
+        <div class="map-loading" data-map-loading>
+          <img src="{{ url_for('static', filename='vendor/ui/loading-green.gif', v='2') }}" alt="">
+          <span>Loading the SPHEREx sky map…</span>
+        </div>
+        <div class="map-badge">SPHEREx DR1 · complete sky · channels 2–102</div>
         <div class="map-help" data-map-help>Click a sky tile to select it</div>
       </div>
       <div class="map-actions">
@@ -46,10 +50,10 @@
       </div>
       <form action="{{ url_for('generate') }}" method="post" class="controls" data-archive-form data-observations-url="{{ url_for('observations_api') }}">
         <label>Right Ascension (°)
-          <input name="ra" data-ra-input type="number" min="0" max="359.999999" step="any" required value="{{ values.ra }}">
+          <input name="ra" data-ra-input type="number" min="0" max="999999" step="any" required value="{{ values.ra }}">
         </label>
         <label>Declination (°)
-          <input name="dec" data-dec-input type="number" min="-90" max="90" step="any" required value="{{ values.dec }}">
+          <input name="dec" data-dec-input type="number" min="-90" max="999999" step="any" required value="{{ values.dec }}">
         </label>
         <label>Cutout size (pixels)
           <input name="size" type="number" min="16" max="1024" step="1" required value="{{ values.size }}">
@@ -78,27 +82,26 @@
         </label>
         <button type="button" data-search-observations>Find current data</button>
         <div class="archive-status" data-archive-status>Select a sky position, then search the live IRSA archive.</div>
-        <label>From observation
-          <select name="start_id" data-start-date required disabled><option value="">Search first</option></select>
-        </label>
-        <label>To observation
-          <select name="end_id" data-end-date required disabled><option value="">Search first</option></select>
-        </label>
-        <label>Maximum animation frames
-          <select name="max_frames">
-            {% for count in (2, 6, 12, 24) %}<option value="{{ count }}"{% if count == 6 %} selected{% endif %}>{{ count }}</option>{% endfor %}
-          </select>
-        </label>
+        <div class="observation-range">
+          <label>From observation
+            <select name="start_id" data-start-date required disabled><option value="">Search first</option></select>
+          </label>
+          <label>To observation
+            <select name="end_id" data-end-date required disabled><option value="">Search first</option></select>
+          </label>
+        </div>
         <label>Candidate threshold: <strong data-sigma-value>5.0σ</strong>
           <input name="sigma_threshold" data-sigma-threshold type="range" min="3" max="10" step="0.5" value="5">
         </label>
         <button type="submit" data-generate disabled>Generate time-lapse</button>
-        <div class="range-note">The observation selectors show every matching result (up to 5,000). For speed and reliability, the animation downloads only the selected number of evenly spaced frames.</div>
+        <div class="generate-status" data-generate-status aria-live="polite"></div>
+        <div class="range-note">Only the two specifically selected From and To observations are downloaded and processed. Intermediate dates are never included.</div>
       </form>
-      <p class="hint">Try the dataset center: RA 133.805°, Dec −8.770°, size 128.</p>
+      <p class="hint">Offline demo: enter 999999 in both RA and Dec to use the two downloaded D5 FITS files. Real dataset center: RA 133.805°, Dec −8.770°.</p>
       {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
     </section>
 
+    <div data-result-mount aria-live="polite">
     {% if result %}
     <section class="viewer" data-viewer>
       <div class="image-stage">
@@ -106,8 +109,8 @@
         <img
           class="frame{% if loop.first %} active{% endif %}"
           src="{{ url_for('output_file', job_id=job_id, filename=observation.frame) }}"
-          alt="SPHEREx observation from {{ observation.date[:10] }}"
-          data-date="{{ observation.date[:10] }}"
+          alt="SPHEREx observation from {{ observation.date|greek_date }}"
+          data-date="{{ observation.date|greek_date }}"
         >
         {% endfor %}
       </div>
@@ -122,13 +125,13 @@
       <div class="timeline" aria-label="Observation timeline">
         {% for observation in result.observations %}
         <button type="button" class="timeline-point{% if loop.first %} active{% endif %}" data-index="{{ loop.index0 }}">
-          <span></span>{{ observation.date[:10] }}
+          <span></span>{{ observation.date|greek_date }}
         </button>
         {% endfor %}
       </div>
 
       <div class="details">
-        <p><strong id="current-date">{{ result.observations[0].date[:10] }}</strong></p>
+        <p><strong id="current-date">{{ result.observations[0].date|greek_date }}</strong></p>
         <p>RA {{ '%.6f'|format(result.ra) }}° · Dec {{ '%.6f'|format(result.dec) }}° · {{ result.size_pixels }} px · {{ result.band }}</p>
         <p>{{ result.selected_count }} frames selected from {{ result.available_count }} matching archive observations.</p>
         {% if result.skipped_count %}
@@ -139,21 +142,43 @@
       {% if result.scientific %}
       <div class="scientific-card">
         <div class="section-heading">
-          <div><p class="step">Scientific validation</p><h2>Corrected comparison</h2></div>
-          <p>{{ '%.1f'|format(result.scientific.valid_percentage) }}% valid pixels · Δλ median {{ '%.6f'|format(result.scientific.median_wavelength_difference_um) }} μm</p>
+          <div><p class="step">Scientific validation</p><h2>What changed between the two dates?</h2></div>
+          <p>Quality-filtered · wavelength-matched · sky-aligned · noise-calibrated</p>
         </div>
-        <img src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.figure) }}" alt="Scientific comparison with aligned images, difference and significance">
+        <div class="reliability-banner reliability-{{ result.scientific.reliability_level }}">
+          <div><span>Reliability of this comparison</span><strong>{{ result.scientific.reliability_label }}</strong></div>
+          <p>{% if result.scientific.reliability_level == 'high' %}The technical checks agree, so the strongest features are suitable for follow-up inspection.{% elif result.scientific.reliability_level == 'moderate' %}The comparison is useful, but every candidate still needs visual and independent confirmation.{% else %}Use this result only to explore the data; the technical checks are not strong enough for a scientific claim.{% endif %}</p>
+        </div>
+        <p class="science-intro">This map answers one simple question: <strong>where did the measured infrared brightness change?</strong> Common background, unsuitable pixels, wavelength mismatch, different image sharpness and underestimated noise are corrected or flagged. It is <strong>not a temperature map</strong>.</p>
+        <img class="change-heatmap" src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.change_heatmap) }}" alt="Infrared brightness change heatmap">
+        <div class="change-legend" aria-label="Heatmap explanation">
+          <span><i class="legend-blue"></i><strong>Blue</strong> Dimmer in the To observation</span>
+          <span><i class="legend-neutral"></i><strong>White</strong> Little or no measured change</span>
+          <span><i class="legend-red"></i><strong>Red</strong> Brighter in the To observation</span>
+        </div>
         <div class="science-metrics">
-          <span><strong>{{ result.scientific.valid_pixels }}</strong> valid pixels</span>
-          <span><strong>{{ result.scientific.significant_pixels_abs_gt_5 }}</strong> pixels above |5σ|</span>
-          <span><strong>{{ '%.6f'|format(result.scientific.background_offset_mjy_sr) }}</strong> MJy/sr background offset</span>
-          <span><strong>{{ result.scientific.candidate_count }}</strong> candidate peaks ≥ {{ result.scientific.sigma_threshold }}σ</span>
-          <span><strong>{{ result.scientific.motion_pair_count }}</strong> preliminary motion pairs</span>
+          <span><strong>{{ '%.1f'|format(result.scientific.valid_percentage) }}%</strong> area passed all quality checks</span>
+          <span><strong>{{ result.scientific.candidate_count }}</strong> distinct features worth reviewing</span>
+          <span><strong>{{ result.scientific.motion_pair_count }}</strong> possible motion patterns—not confirmations</span>
+          <span><strong>{{ '%.2f'|format(result.scientific.uncertainty_scale_factor) }}×</strong> conservative noise correction</span>
         </div>
-        <img class="candidate-overview" src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.candidate_overview) }}" alt="Detected positive and negative residual candidates">
-        {% if result.scientific.motion_figure %}
-        <img class="candidate-overview" src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.motion_figure) }}" alt="Preliminary motion hypotheses">
-        {% endif %}
+        <div class="method-steps">
+          <article><strong>1 · Compare fairly</strong><span>Same sky coordinates, compatible wavelength and common image sharpness.</span></article>
+          <article><strong>2 · Reject bad evidence</strong><span>Flagged pixels, missing coverage and uncertain edges are excluded.</span></article>
+          <article><strong>3 · Measure confidence</strong><span>Instrument variance is checked against the noise actually seen in the residual.</span></article>
+        </div>
+        <p class="science-note"><strong>How to read this responsibly:</strong> red or blue means measured brightening or dimming, not automatically a planet, transient or motion. A credible discovery requires repeat detections, catalogue checks and ideally independent observations.</p>
+        <details class="science-technical">
+          <summary>Show technical validation</summary>
+          <p>{{ result.scientific.valid_pixels }} valid pixels · median wavelength difference {{ '%.6f'|format(result.scientific.median_wavelength_difference_um) }} μm · background correction {{ '%.6f'|format(result.scientific.background_offset_mjy_sr) }} MJy/sr · {{ result.scientific.brighter_pixels_gt_5 }} pixels above +{{ '%.1f'|format(result.scientific.sigma_threshold) }}σ · {{ result.scientific.dimmer_pixels_lt_minus_5 }} below −{{ '%.1f'|format(result.scientific.sigma_threshold) }}σ</p>
+          <p><strong>PSF/resolution:</strong> {{ result.scientific.psf_matching.reason }}{% if result.scientific.psf_matching.source_count %} Based on {{ result.scientific.psf_matching.source_count }} usable point sources.{% endif %}</p>
+          <p><strong>Scope:</strong> this is a difference-imaging screening pipeline for hackathon exploration. It does not perform catalogue cross-matching, multi-epoch confirmation, forced photometry or an independent orbit fit.</p>
+          <img src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.figure) }}" alt="Aligned images, corrected difference and significance diagnostics">
+          <img src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.candidate_overview) }}" alt="Detected positive and negative residual candidates">
+          {% if result.scientific.motion_figure %}
+          <img src="{{ url_for('output_file', job_id=job_id, filename=result.scientific.motion_figure) }}" alt="Preliminary motion hypotheses">
+          {% endif %}
+        </details>
       </div>
 
       {% if result.scientific.candidates %}
@@ -182,7 +207,7 @@
       </section>
       {% endif %}
 
-      <details class="terminal-panel" open>
+      <details class="terminal-panel">
         <summary>Analysis terminal</summary>
         <pre>{{ result.terminal_output }}</pre>
       </details>
@@ -198,12 +223,13 @@
       </div>
     </section>
     {% endif %}
+    </div>
   </main>
   <script type="module">
     import A from "{{ url_for('static', filename='vendor/aladin/aladin.js', v='3.8.2') }}";
     window.A = A;
     window.dispatchEvent(new Event("aladin-ready"));
   </script>
-  <script src="{{ url_for('static', filename='viewer.js', v='20261114-13') }}"></script>
+  <script src="{{ url_for('static', filename='viewer.js', v='20261114-25') }}"></script>
 </body>
 </html>
