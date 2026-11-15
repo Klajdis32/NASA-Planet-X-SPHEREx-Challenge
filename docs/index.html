@@ -9,50 +9,79 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="#top" aria-label="SPHEREx viewer home">
-      <span>NASA SPHEREx</span>
-      <strong>Sky Time-Lapse</strong>
-    </a>
-    <div class="header-status"><i></i> Static presentation · offline dataset</div>
-    <nav aria-label="Page actions">
-      <button class="quiet" type="button" data-history-open>History</button>
-      <button class="quiet" type="button" data-text-size aria-pressed="false">Larger text</button>
-    </nav>
-  </header>
-
   <main id="main">
-    <section class="sky-hero" id="top" aria-labelledby="hero-title">
-      <img src="assets/images/allsky-channel-2.png" alt="SPHEREx infrared all-sky map in Aitoff projection">
-      <div class="sky-shade"></div>
-      <div class="target-marker" aria-label="Offline dataset position at RA 133.805 degrees and Declination minus 8.770 degrees"><span></span></div>
-      <div class="hero-copy">
-        <p class="eyebrow">NASA Planet X · Hackathon prototype</p>
-        <h1 id="hero-title">One sky.<br>Two moments in time.</h1>
-        <p>Explore a real two-epoch SPHEREx D5 comparison at RA 133.805°, Dec −8.770°. This presentation uses local, precomputed science products and never depends on a live archive request.</p>
-        <div class="hero-actions">
-          <button type="button" data-load-demo>Load offline demo</button>
-          <a class="button quiet" href="assets/downloads/spherex-analysis-report.pdf" download>Download report</a>
-        </div>
+    <header class="dynamic-header" id="top">
+      <div class="header-title">
+        <p class="eyebrow">NASA SPHEREx · Hackathon prototype</p>
+        <h1 id="hero-title">Sky Time-Lapse Viewer</h1>
+        <p>Explore the SPHEREx infrared sky, then open the prepared offline comparison of meaningful changes through time.</p>
       </div>
-      <aside class="dataset-card" aria-label="Offline dataset summary">
-        <p class="step">Prepared dataset</p>
-        <strong>SPHEREx-D5</strong>
-        <dl>
-          <div><dt>From</dt><dd>06/05/2025</dd></div>
-          <div><dt>To</dt><dd>14/05/2026</dd></div>
-          <div><dt>Cutout</dt><dd>128 px</dd></div>
-          <div><dt>Threshold</dt><dd>5.0σ</dd></div>
-        </dl>
-      </aside>
+      <div class="header-step">
+        <p class="step">Step 1</p>
+        <h2>Select a sky position</h2>
+        <p>Scroll to zoom · drag to move · click to explore</p>
+      </div>
+      <nav aria-label="Page actions">
+        <button class="quiet" type="button" data-history-open>History</button>
+        <details class="accessibility-menu" data-accessibility-menu>
+          <summary>Accessibility</summary>
+          <div class="accessibility-panel" aria-label="Accessibility settings">
+            <h2>Display settings</h2>
+            <fieldset>
+              <legend>Text size</legend>
+              <label><input type="radio" name="accessibility-font-size" value="normal" data-font-size> Normal</label>
+              <label><input type="radio" name="accessibility-font-size" value="large" data-font-size> Large</label>
+              <label><input type="radio" name="accessibility-font-size" value="xlarge" data-font-size> Extra large</label>
+            </fieldset>
+            <label class="accessibility-switch"><input type="checkbox" data-high-contrast> Higher contrast</label>
+            <label class="accessibility-switch"><input type="checkbox" data-reduce-motion> Reduce motion</label>
+            <label class="accessibility-switch"><input type="checkbox" data-readable-spacing> Increase text spacing</label>
+            <button type="button" class="quiet" data-accessibility-reset>Reset settings</button>
+            <p class="sr-only" data-accessibility-status aria-live="polite"></p>
+          </div>
+        </details>
+      </nav>
+    </header>
+
+    <section class="aladin-section" aria-labelledby="hero-title" data-hips-url="https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube">
+      <div class="sky-viewport" data-sky-viewport tabindex="0" aria-label="Interactive Aladin SPHEREx infrared all-sky map">
+        <div id="spherex-all-sky" class="aladin-map" data-aladin-map></div>
+        <div class="sky-layer" data-sky-layer hidden>
+          <img src="assets/images/allsky-channel-2.png" alt="SPHEREx infrared all-sky map in Aitoff projection" draggable="false">
+          <div class="target-marker" aria-label="Prepared offline dataset position"><span></span></div>
+        </div>
+        <div class="map-loading" data-map-loading><img src="assets/images/loading-green.gif" alt=""><span>Loading the 360° SPHEREx sky…</span></div>
+        <div class="map-badge">SPHEREx DR1 · complete sky · channels 2–102</div>
+        <div class="map-help" data-map-help>Loading Aladin…</div>
+      </div>
+      <p class="map-fallback">The normal view is a continuous 360° Aitoff map. The packaged overview is used only if Aladin or WebGL cannot load.</p>
+      <div class="map-actions floating-map-actions" aria-label="Map controls">
+        <button class="quiet zoom-button" type="button" data-zoom-out aria-label="Zoom out">−</button>
+        <button class="quiet" type="button" data-reset-map>Reset view</button>
+        <button class="quiet zoom-button" type="button" data-zoom-in aria-label="Zoom in">+</button>
+        <label>Spectral channel
+          <select data-sky-channel></select>
+        </label>
+      </div>
     </section>
 
-    <section class="demo-intro" aria-labelledby="demo-title">
-      <div>
-        <p class="step">Offline demo</p>
-        <h2 id="demo-title">A reliable presentation, even when IRSA is busy</h2>
+    <section class="comparison-panel" aria-labelledby="comparison-title">
+      <div class="panel-heading">
+        <div><p class="step">Step 2</p><h2 id="comparison-title">Choose the comparison</h2></div>
+        <span class="offline-badge">Static mode · offline only</span>
       </div>
-      <p>The same quality-filtered outputs produced by the Python pipeline are packaged with this page. Loading the demo is instant; no FITS download or server-side analysis is performed.</p>
+      <div class="locked-controls">
+        <label>Right Ascension (°)<input type="text" value="133.805" disabled></label>
+        <label>Declination (°)<input type="text" value="−8.770" disabled></label>
+        <label>Cutout size (pixels)<input type="text" value="128" disabled></label>
+        <label>Spectral band<select disabled><option>SPHEREx-D5</option></select></label>
+        <label>From observation<select disabled><option>06/05/2025 · saved observation</option></select></label>
+        <label>To observation<select disabled><option>14/05/2026 · saved observation</option></select></label>
+      </div>
+      <div class="offline-action">
+        <div><strong>Prepared offline dataset</strong><span>The live search and editable parameters require the dynamic Flask application and are locked here.</span></div>
+        <button type="button" data-load-demo>Open offline demo</button>
+      </div>
     </section>
 
     <section class="results" data-results hidden tabindex="-1" aria-label="Offline SPHEREx analysis results">
@@ -110,11 +139,11 @@
           <article><strong>0</strong><span>motion hypotheses</span></article>
           <article><strong>1.00×</strong><span>noise correction</span></article>
         </div>
-        <details class="technical">
-          <summary>View the technical comparison</summary>
+        <section class="technical technical-always-open" aria-labelledby="technical-comparison-title">
+          <h3 id="technical-comparison-title">Technical comparison</h3>
           <p>WCS aligned · wavelength matched · PSF matched · background corrected · noise calibrated</p>
           <img class="wide-figure" src="assets/images/scientific-comparison.png" alt="Aligned observations, corrected difference and noise-calibrated significance">
-        </details>
+        </section>
       </section>
 
       <section class="candidates" aria-labelledby="candidate-title">
@@ -142,5 +171,10 @@
 
   <footer><strong>NASA Planet X · SPHEREx Hackathon Prototype</strong><span>Static offline presentation · no live archive dependency</span></footer>
   <script src="assets/site.js"></script>
+  <script type="module">
+    import A from "./assets/vendor/aladin/aladin.js";
+    window.A = A;
+    window.dispatchEvent(new Event("aladin-ready"));
+  </script>
 </body>
 </html>
