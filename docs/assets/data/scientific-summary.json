@@ -1,0 +1,82 @@
+{
+  "valid_pixels": 2427895,
+  "total_pixels": 4161600,
+  "valid_percentage": 58.34042195309496,
+  "median_wavelength_difference_um": 0.00016299154167143115,
+  "max_wavelength_difference_um": 0.0002940240694417895,
+  "background_offset_mjy_sr": -0.0020097196102142334,
+  "significant_pixels_abs_gt_5": 6929,
+  "brighter_pixels_gt_5": 4173,
+  "dimmer_pixels_lt_minus_5": 2756,
+  "wavelength_tolerance_um": 0.005,
+  "sigma_threshold": 5.0,
+  "uncertainty_scale_factor": 1.0,
+  "psf_matching": {
+    "status": "applied",
+    "reason": "The from observation was broadened to the common resolution.",
+    "source_count": 34,
+    "fwhm_from_pixels": 1.3892658090953163,
+    "fwhm_to_pixels": 1.5778973517922616,
+    "kernel_sigma_pixels": 0.3177021521072765
+  },
+  "reliability_level": "moderate",
+  "reliability_label": "Usable with caution",
+  "reliability_checks": {
+    "coverage": false,
+    "wavelength": true,
+    "noise": true,
+    "resolution": true
+  },
+  "candidate_count": 3,
+  "motion_pair_count": 0,
+  "candidate_overview": "candidate_overview.png",
+  "motion_figure": null,
+  "change_heatmap": "change_heatmap.png",
+  "candidates": [
+    {
+      "rank": 1,
+      "x": 1994,
+      "y": 1405,
+      "ra": 135.1860147743832,
+      "dec": -9.936159397090913,
+      "polarity": "negative",
+      "score": -899.9141235351562,
+      "propagated_significance": -32.861751556396484,
+      "classification": "faded_or_disappeared",
+      "quality_flag": "bright_source_residual",
+      "component_pixels": 27,
+      "valid_fraction": 1.0,
+      "figure": "candidate_01.png"
+    },
+    {
+      "rank": 2,
+      "x": 412,
+      "y": 1769,
+      "ra": 132.38723936744077,
+      "dec": -9.65165154072614,
+      "polarity": "negative",
+      "score": -45.6588020324707,
+      "propagated_significance": -8.85268783569336,
+      "classification": "faded_or_disappeared",
+      "quality_flag": "bright_source_residual",
+      "component_pixels": 19,
+      "valid_fraction": 1.0,
+      "figure": "candidate_02.png"
+    },
+    {
+      "rank": 3,
+      "x": 46,
+      "y": 799,
+      "ra": 132.33716032441225,
+      "dec": -7.886829745119503,
+      "polarity": "negative",
+      "score": -12.765789031982422,
+      "propagated_significance": -6.678138732910156,
+      "classification": "faded_or_disappeared",
+      "quality_flag": "single_pixel_residual",
+      "component_pixels": 1,
+      "valid_fraction": 1.0,
+      "figure": "candidate_03.png"
+    }
+  ]
+}

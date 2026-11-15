@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A static SPHEREx two-epoch infrared sky comparison prepared for the NASA Planet X hackathon.">
+  <title>SPHEREx Sky Time-Lapse · Offline Demo</title>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="SPHEREx viewer home">
+      <span>NASA SPHEREx</span>
+      <strong>Sky Time-Lapse</strong>
+    </a>
+    <div class="header-status"><i></i> Static presentation · offline dataset</div>
+    <nav aria-label="Page actions">
+      <button class="quiet" type="button" data-history-open>History</button>
+      <button class="quiet" type="button" data-text-size aria-pressed="false">Larger text</button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="sky-hero" id="top" aria-labelledby="hero-title">
+      <img src="assets/images/allsky-channel-2.png" alt="SPHEREx infrared all-sky map in Aitoff projection">
+      <div class="sky-shade"></div>
+      <div class="target-marker" aria-label="Offline dataset position at RA 133.805 degrees and Declination minus 8.770 degrees"><span></span></div>
+      <div class="hero-copy">
+        <p class="eyebrow">NASA Planet X · Hackathon prototype</p>
+        <h1 id="hero-title">One sky.<br>Two moments in time.</h1>
+        <p>Explore a real two-epoch SPHEREx D5 comparison at RA 133.805°, Dec −8.770°. This presentation uses local, precomputed science products and never depends on a live archive request.</p>
+        <div class="hero-actions">
+          <button type="button" data-load-demo>Load offline demo</button>
+          <a class="button quiet" href="assets/downloads/spherex-analysis-report.pdf" download>Download report</a>
+        </div>
+      </div>
+      <aside class="dataset-card" aria-label="Offline dataset summary">
+        <p class="step">Prepared dataset</p>
+        <strong>SPHEREx-D5</strong>
+        <dl>
+          <div><dt>From</dt><dd>06/05/2025</dd></div>
+          <div><dt>To</dt><dd>14/05/2026</dd></div>
+          <div><dt>Cutout</dt><dd>128 px</dd></div>
+          <div><dt>Threshold</dt><dd>5.0σ</dd></div>
+        </dl>
+      </aside>
+    </section>
+
+    <section class="demo-intro" aria-labelledby="demo-title">
+      <div>
+        <p class="step">Offline demo</p>
+        <h2 id="demo-title">A reliable presentation, even when IRSA is busy</h2>
+      </div>
+      <p>The same quality-filtered outputs produced by the Python pipeline are packaged with this page. Loading the demo is instant; no FITS download or server-side analysis is performed.</p>
+    </section>
+
+    <section class="results" data-results hidden tabindex="-1" aria-label="Offline SPHEREx analysis results">
+      <div class="result-heading">
+        <div><p class="step">Two selected observations</p><h2>Sky time-lapse</h2></div>
+        <div class="download-row">
+          <a class="button" href="assets/downloads/spherex-analysis-report.pdf" download>PDF report</a>
+          <a class="button quiet" href="assets/data/scientific-summary.json" download>JSON data</a>
+          <a class="button quiet" href="assets/downloads/spherex-timelapse.gif" download>GIF</a>
+        </div>
+      </div>
+
+      <div class="viewer-grid">
+        <div>
+          <div class="frame-stage" data-frame-stage>
+            <figure class="frame active" data-frame><img src="assets/images/frame-2025.png" alt="SPHEREx observation from 6 May 2025"><figcaption>06/05/2025 · From observation</figcaption></figure>
+            <figure class="frame" data-frame><img src="assets/images/frame-2026.png" alt="SPHEREx observation from 14 May 2026"><figcaption>14/05/2026 · To observation</figcaption></figure>
+          </div>
+          <div class="transport" aria-label="Time-lapse controls">
+            <button class="quiet" type="button" data-prev>Previous</button>
+            <button type="button" data-play>Play</button>
+            <button class="quiet" type="button" data-pause>Pause</button>
+            <button class="quiet" type="button" data-next>Next</button>
+          </div>
+          <div class="timeline" aria-label="Observation dates">
+            <button class="active" type="button" data-point="0"><i></i><span>06/05/2025</span></button>
+            <button type="button" data-point="1"><i></i><span>14/05/2026</span></button>
+          </div>
+        </div>
+        <div class="observation-details">
+          <p class="step">Selected position</p>
+          <h3>RA 133.805°<br>Dec −8.770°</h3>
+          <p>Two released D5 observations, aligned on the same celestial grid and displayed with a shared brightness scale.</p>
+          <div class="detail-pair"><span>Spectral detector</span><strong>D5</strong></div>
+          <div class="detail-pair"><span>Time baseline</span><strong>373 days</strong></div>
+          <div class="detail-pair"><span>Frame coverage</span><strong>99.8%</strong></div>
+        </div>
+      </div>
+
+      <section class="science" aria-labelledby="science-title">
+        <div class="science-title">
+          <div><p class="step">Scientific validation</p><h2 id="science-title">What changed between the two dates?</h2></div>
+          <div class="reliability"><span>Reliability</span><strong>Usable with caution</strong></div>
+        </div>
+        <p class="lead">This is an infrared <strong>brightness-change map</strong>, not a physical temperature map. Blue means dimmer, white means little measured change and red means brighter in the second observation.</p>
+        <img class="wide-figure" src="assets/images/change-heatmap.png" alt="Infrared brightness change heatmap where blue is dimmer and red is brighter">
+        <div class="legend" aria-label="Heatmap legend">
+          <span><i class="blue"></i><b>Blue</b> Dimmer</span>
+          <span><i class="white"></i><b>White</b> Little change</span>
+          <span><i class="red"></i><b>Red</b> Brighter</span>
+        </div>
+        <div class="metrics">
+          <article><strong>58.3%</strong><span>area passed every quality check</span></article>
+          <article><strong>3</strong><span>features flagged for review</span></article>
+          <article><strong>0</strong><span>motion hypotheses</span></article>
+          <article><strong>1.00×</strong><span>noise correction</span></article>
+        </div>
+        <details class="technical">
+          <summary>View the technical comparison</summary>
+          <p>WCS aligned · wavelength matched · PSF matched · background corrected · noise calibrated</p>
+          <img class="wide-figure" src="assets/images/scientific-comparison.png" alt="Aligned observations, corrected difference and noise-calibrated significance">
+        </details>
+      </section>
+
+      <section class="candidates" aria-labelledby="candidate-title">
+        <div><p class="step">Candidate review</p><h2 id="candidate-title">Three residuals worth inspecting</h2></div>
+        <p class="lead">These are screening results, not confirmed objects. All three carry artifact warnings and require independent follow-up.</p>
+        <div class="candidate-grid">
+          <article><img src="assets/images/candidate-01.png" alt="Candidate one residual cutout"><div><b>#1 · faded or disappeared</b><span>RA 135.18601° · Dec −9.93616°</span><em>Bright-source residual</em></div></article>
+          <article><img src="assets/images/candidate-02.png" alt="Candidate two residual cutout"><div><b>#2 · faded or disappeared</b><span>RA 132.38724° · Dec −9.65165°</span><em>Bright-source residual</em></div></article>
+          <article><img src="assets/images/candidate-03.png" alt="Candidate three residual cutout"><div><b>#3 · faded or disappeared</b><span>RA 132.33716° · Dec −7.88683°</span><em>Single-pixel residual</em></div></article>
+        </div>
+      </section>
+
+      <section class="science-note">
+        <strong>Scientific scope</strong>
+        <p>This hackathon analysis is designed for transparent exploration and presentation. A credible discovery requires repeat detections, catalogue cross-matching, multi-epoch photometry and independent confirmation.</p>
+      </section>
+    </section>
+  </main>
+
+  <dialog class="history-dialog" data-history-dialog aria-labelledby="history-title">
+    <div class="dialog-heading"><div><p class="step">This browser</p><h2 id="history-title">Demo history</h2></div><button class="quiet" type="button" data-history-close>Close</button></div>
+    <p>Opening the offline dataset is stored only in this browser. You can rename or remove each entry.</p>
+    <div class="history-list" data-history-list></div>
+  </dialog>
+
+  <footer><strong>NASA Planet X · SPHEREx Hackathon Prototype</strong><span>Static offline presentation · no live archive dependency</span></footer>
+  <script src="assets/site.js"></script>
+</body>
+</html>

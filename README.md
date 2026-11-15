@@ -190,6 +190,31 @@ Dec: −8.770°
 Entering `999999` in both coordinate fields remains available only for compatibility
 with older local demonstrations.
 
+## Static GitHub Pages presentation
+
+The `docs/` directory contains a standalone static presentation that works without
+Flask, IRSA, Python, or a running laptop. It includes the prepared D5 offline dataset,
+two-frame viewer, timeline controls, scientific plots, candidate review, PDF/JSON/GIF
+downloads, and browser-local history.
+
+To publish it with GitHub Pages:
+
+1. Push the `docs/` directory to the `main` branch.
+2. Open the repository **Settings → Pages**.
+3. Select **Deploy from a branch**.
+4. Select branch **main** and folder **/docs**.
+5. Save and wait for the Pages deployment to complete.
+
+The expected project URL is:
+
+```text
+https://klajdis32.github.io/NASA-Planet-X-SPHEREx-Challenge/
+```
+
+This version intentionally does not perform live observation searches or FITS
+processing. Its purpose is a fast, reliable hackathon presentation of the real
+precomputed analysis.
+
 ## Command-line cutout generator
 
 The original processing workflow remains available:
