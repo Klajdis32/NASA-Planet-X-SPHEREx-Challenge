@@ -14,7 +14,7 @@ and GIF downloads.
 > It cannot search IRSA, download new FITS observations, select different dates, or
 > run the Python scientific pipeline.
 
-### [Dynamic Flask demo](https://six-poets-send.loca.lt/)
+### [Dynamic Flask demo](https://chatty-quail-45.loca.lt/)
 
 The dynamic version demonstrates the complete application workflow: interactive sky
 selection, current IRSA observation search, From/To selection, FITS processing,
