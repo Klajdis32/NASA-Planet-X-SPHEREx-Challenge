@@ -1,5 +1,28 @@
 # NASA Planet X — SPHEREx Sky Time-Lapse Viewer
 
+## Live demos
+
+### [Static GitHub Pages demo](https://klajdis32.github.io/NASA-Planet-X-SPHEREx-Challenge/)
+
+The static demo is a reliable, server-free presentation of the final precomputed
+SPHEREx results. It includes the two observation frames, time-lapse controls,
+brightness-change heatmap, scientific validation, candidate review, PDF, JSON,
+and GIF downloads.
+
+> **Important:** The static version does **not** represent 100% of the application's
+> functionality. It is intended only to present the final prepared data and analysis.
+> It cannot search IRSA, download new FITS observations, select different dates, or
+> run the Python scientific pipeline.
+
+### [Dynamic Flask demo](https://six-poets-send.loca.lt/)
+
+The dynamic version demonstrates the complete application workflow: interactive sky
+selection, current IRSA observation search, From/To selection, FITS processing,
+scientific analysis, downloadable reports, and local history. This temporary demo is
+available only while the Flask server and public tunnel are running.
+
+---
+
 An accessible web application for exploring current **SPHEREx** observations and comparing how infrared brightness changes between two dates.
 
 This project was built as a focused hackathon prototype. A user can select a position on a 360° sky map, search observations available through NASA/IPAC IRSA, choose an exact **From** and **To** observation, and generate an aligned two-epoch comparison with scientific quality checks.
