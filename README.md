@@ -1,6 +1,6 @@
 # NASA Planet X — SPHEREx Sky Time-Lapse Viewer
 
-## Live demos
+## Live demo
 
 ### [Static GitHub Pages demo](https://klajdis32.github.io/NASA-Planet-X-SPHEREx-Challenge/)
 
@@ -13,13 +13,6 @@ and GIF downloads.
 > functionality. It is intended only to present the final prepared data and analysis.
 > It cannot search IRSA, download new FITS observations, select different dates, or
 > run the Python scientific pipeline.
-
-### [Dynamic Flask demo](https://chatty-quail-45.loca.lt/)
-
-The dynamic version demonstrates the complete application workflow: interactive sky
-selection, current IRSA observation search, From/To selection, FITS processing,
-scientific analysis, downloadable reports, and local history. This temporary demo is
-available only while the Flask server and public tunnel are running.
 
 ---
 
