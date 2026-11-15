@@ -30,6 +30,8 @@ SPHEREx detector band, including wide and deep-field collections. All available
 dates are searched by default, but any From/To pair can be chosen. The
 server downloads small IRSA cutouts, caches them, aligns them to one WCS, and
 builds the animation. Full parent FITS files are never downloaded.
+The application waits for the TAP response without imposing a client-side
+search timeout and does not switch to another discovery API.
 
 The first and last usable frames also run through the project's scientific
 analysis modules: `fits_loader.py`, `quality_control.py`,

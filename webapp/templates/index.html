@@ -4,22 +4,54 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SPHEREx Sky Time-Lapse</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261114-a11y') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20261115-history') }}">
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <main class="page" id="main-content" tabindex="-1">
-    <header>
-      <p class="eyebrow">NASA SPHEREx · Hackathon prototype</p>
-      <h1>Sky Time-Lapse Viewer</h1>
-      <p class="intro">Explore every current DR1 + QR3 observation at a selected sky position, then compare meaningful changes through time.</p>
-    </header>
-
-    <section class="panel sky-picker" data-sky-picker data-tile-url="{{ url_for('all_sky_tile_api') }}" data-hips-url="https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube">
-      <div class="section-heading">
-        <div><p class="step">Step 1</p><h2>Select a sky position</h2></div>
+    <header class="hero-copy" id="site-header" data-site-header>
+      <div class="hero-text">
+        <p class="eyebrow">NASA SPHEREx · Hackathon prototype</p>
+        <h1>Sky Time-Lapse Viewer</h1>
+        <p class="intro">Explore every current DR1 + QR3 observation at a selected sky position, then compare meaningful changes through time.</p>
+      </div>
+      <div class="header-step">
+        <p class="step">Step 1</p>
+        <h2>Select a sky position</h2>
         <p>Scroll to zoom · drag to move · click to select</p>
       </div>
+      <div class="header-actions">
+        <button type="button" class="secondary header-action" data-history-open data-history-url="{{ url_for('history_api') }}">History</button>
+        <details class="accessibility-menu" data-accessibility-menu>
+          <summary>Accessibility</summary>
+          <div class="accessibility-panel" aria-label="Accessibility settings">
+            <h2>Display settings</h2>
+            <fieldset>
+              <legend>Text size</legend>
+              <label><input type="radio" name="accessibility-font-size" value="normal" data-font-size> Normal</label>
+              <label><input type="radio" name="accessibility-font-size" value="large" data-font-size> Large</label>
+              <label><input type="radio" name="accessibility-font-size" value="xlarge" data-font-size> Extra large</label>
+            </fieldset>
+            <label class="accessibility-switch"><input type="checkbox" data-high-contrast> Higher contrast</label>
+            <label class="accessibility-switch"><input type="checkbox" data-reduce-motion> Reduce motion</label>
+            <label class="accessibility-switch"><input type="checkbox" data-readable-spacing> Increase text spacing</label>
+            <button type="button" class="secondary" data-accessibility-reset>Reset settings</button>
+            <p class="sr-only" data-accessibility-status aria-live="polite"></p>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <dialog class="history-dialog" data-history-dialog aria-labelledby="history-title">
+      <div class="history-heading">
+        <div><p class="step">Local archive</p><h2 id="history-title">Analysis history</h2></div>
+        <button type="button" class="secondary" data-history-close>Close</button>
+      </div>
+      <p class="history-help">Completed searches are stored only on this computer. Download the report or data from any previous result.</p>
+      <div class="history-list" data-history-list><p>Loading history…</p></div>
+    </dialog>
+
+    <section class="panel sky-picker" data-sky-picker data-tile-url="{{ url_for('all_sky_tile_api') }}" data-hips-url="https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube">
       <p class="sr-only" id="sky-map-help">Use the map with a pointer, or enter Right Ascension and Declination manually in step 2.</p>
       <div class="sky-viewport all-sky-map" data-sky-viewport aria-label="Interactive full-sky SPHEREx map" aria-describedby="sky-map-help">
         <div id="spherex-all-sky" class="aladin-map" data-aladin-map></div>
@@ -45,12 +77,13 @@
       <p class="map-fallback">The normal view is a continuous 360° Aitoff map. The 768-tile technical atlas is used only as a fallback when WebGL2 is unavailable.</p>
     </section>
 
-    <section class="panel form-panel">
+    <section class="panel form-panel" id="comparison-panel" aria-labelledby="comparison-title">
       <div class="section-heading">
-        <div><p class="step">Step 2</p><h2>Choose the comparison</h2></div>
+        <div><p class="step">Step 2</p><h2 id="comparison-title">Choose the comparison</h2></div>
         <p class="time-gap"><strong>Latest IRSA releases</strong> · DR1 + current QR3 observations</p>
       </div>
       <form action="{{ url_for('generate') }}" method="post" class="controls" data-archive-form data-observations-url="{{ url_for('observations_api') }}">
+        <input name="demo_mode" data-demo-mode type="hidden" value="">
         <label>Right Ascension (°)
           <input name="ra" data-ra-input type="number" min="0" max="999999" step="any" required value="{{ values.ra }}">
         </label>
@@ -58,7 +91,7 @@
           <input name="dec" data-dec-input type="number" min="-90" max="999999" step="any" required value="{{ values.dec }}">
         </label>
         <label>Cutout size (pixels)
-          <input name="size" type="number" min="16" max="1024" step="1" required value="{{ values.size }}">
+          <input name="size" data-size-input type="number" min="16" max="1024" step="1" required value="{{ values.size }}">
         </label>
         <label>Spectral band
           <select name="band" data-band-input>
@@ -82,7 +115,10 @@
         <label>Period to
           <input name="to_date" data-to-date type="date">
         </label>
-        <button type="button" data-search-observations>Find current data</button>
+        <div class="search-actions">
+          <button type="button" data-search-observations>Find current data</button>
+          <button type="button" class="secondary" data-offline-demo>Offline demo</button>
+        </div>
         <div class="archive-status" data-archive-status role="status" aria-live="polite" aria-atomic="true">Select a sky position, then search the live IRSA archive.</div>
         <div class="observation-range">
           <label>From observation
@@ -99,13 +135,13 @@
         <div class="generate-status" data-generate-status role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="range-note">Only the two specifically selected From and To observations are downloaded and processed. Intermediate dates are never included.</div>
       </form>
-      <p class="hint">Offline demo: enter 999999 in both RA and Dec to use the two downloaded D5 FITS files. Real dataset center: RA 133.805°, Dec −8.770°.</p>
+      <p class="hint">For a fast presentation, choose <strong>Offline demo</strong>. It loads the two local D5 observations at RA 133.805°, Dec −8.770° and reuses the saved default analysis.</p>
       {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
     </section>
 
     <div data-result-mount aria-live="polite" aria-relevant="additions">
     {% if result %}
-    <section class="viewer" data-viewer>
+    <section class="viewer" data-viewer tabindex="-1" aria-label="Generated SPHEREx comparison results">
       <div class="image-stage">
         {% for observation in result.observations %}
         <img
@@ -135,7 +171,7 @@
       <div class="details">
         <p><strong id="current-date">{{ result.observations[0].date|greek_date }}</strong></p>
         <p>RA {{ '%.6f'|format(result.ra) }}° · Dec {{ '%.6f'|format(result.dec) }}° · {{ result.size_pixels }} px · {{ result.band }}</p>
-        <p>{{ result.selected_count }} frames selected from {{ result.available_count }} matching archive observations.</p>
+        <p>{{ result.selected_count }} frames selected from {{ result.available_count }} matching archive observations.{% if result.demo_cache_hit %} Saved offline analysis loaded instantly.{% endif %}</p>
         {% if result.skipped_count %}
         <p class="skip-notice">{{ result.skipped_count }} unavailable frame{% if result.skipped_count != 1 %}s were{% else %} was{% endif %} skipped automatically.</p>
         {% endif %}
@@ -145,7 +181,15 @@
       <div class="scientific-card">
         <div class="section-heading">
           <div><p class="step">Scientific validation</p><h2>What changed between the two dates?</h2></div>
-          <p>Quality-filtered · wavelength-matched · sky-aligned · noise-calibrated</p>
+          <div class="science-heading-actions">
+            <p>Quality-filtered · wavelength-matched · sky-aligned · noise-calibrated</p>
+            <div class="report-downloads">
+              {% if result.pdf_report %}
+              <a class="download" href="{{ url_for('output_file', job_id=job_id, filename=result.pdf_report) }}" download>Download PDF report</a>
+              {% endif %}
+              <a class="download secondary-download" href="{{ url_for('output_file', job_id=job_id, filename=result.scientific.summary_file) }}" download>Download data (JSON)</a>
+            </div>
+          </div>
         </div>
         <div class="reliability-banner reliability-{{ result.scientific.reliability_level }}">
           <div><span>Reliability of this comparison</span><strong>{{ result.scientific.reliability_label }}</strong></div>
@@ -232,6 +276,6 @@
     window.A = A;
     window.dispatchEvent(new Event("aladin-ready"));
   </script>
-  <script src="{{ url_for('static', filename='viewer.js', v='20261114-a11y') }}"></script>
+  <script src="{{ url_for('static', filename='viewer.js', v='20261115-history') }}"></script>
 </body>
 </html>

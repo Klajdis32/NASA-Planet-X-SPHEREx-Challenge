@@ -1,8 +1,11 @@
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
+from datetime import datetime
 from io import StringIO
+import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -14,7 +17,16 @@ from astropy import units as u
 from astropy_healpix import HEALPix
 from uuid import uuid4
 
-from flask import Flask, abort, jsonify, render_template, request, send_file, send_from_directory
+from flask import (
+    Flask,
+    abort,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+    url_for,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,11 +41,11 @@ from processing.sky_cutout import (  # noqa: E402
     generate_cutouts,
     preview_pixel_to_sky,
 )
+from processing.pdf_report import generate_pdf_report  # noqa: E402
 from processing.spherex_archive import (  # noqa: E402
     ArchiveError,
     BANDS,
     download_cutout,
-    search_local_catalog,
     search_observations,
 )
 from scientific_comparison import run_scientific_comparison  # noqa: E402
@@ -44,6 +56,7 @@ ARCHIVE_CACHE = BASE_DIR / "data" / "cache" / "spherex_cutouts"
 SEARCH_CACHE_TTL = 10 * 60
 _search_cache = {}
 _search_cache_lock = threading.Lock()
+_history_lock = threading.Lock()
 ALL_SKY_ORDER = 3
 ALL_SKY_COLUMNS = 27
 ALL_SKY_ROWS = 29
@@ -53,10 +66,83 @@ ALL_SKY_HIPS_ROOT = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_all
 DEMO_SENTINEL = 999999.0
 DEMO_RA = 133.805
 DEMO_DEC = -8.770
+DEMO_JOB_ID = "d" * 32
+DEMO_CACHE_VERSION = "20261115-v1"
+DEMO_SIZE = 128
+DEMO_SIGMA_THRESHOLD = 5.0
 DEMO_FILES = (
     BASE_DIR / "data" / "raw" / "level2_2025W19_1B_0181_3D5_spx_l2b-v27-2026-197.fits",
     BASE_DIR / "data" / "raw" / "level2_2026W20_1A_1166_1D5_spx_l2b-v27-2026-246.fits",
 )
+
+
+def read_history(output_root):
+    history_file = Path(output_root) / "history.json"
+    if not history_file.is_file():
+        return []
+    try:
+        entries = json.loads(history_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return entries if isinstance(entries, list) else []
+
+
+def record_history(output_root, job_id, metadata):
+    """Keep a local index of completed comparisons and their exports."""
+    observations = metadata.get("observations") or []
+    scientific = metadata.get("scientific") or {}
+    entry = {
+        "id": uuid4().hex,
+        "job_id": job_id,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "ra": metadata.get("ra"),
+        "dec": metadata.get("dec"),
+        "band": metadata.get("band"),
+        "from_observation": observations[0].get("date") if observations else None,
+        "to_observation": observations[-1].get("date") if observations else None,
+        "pdf": metadata.get("pdf_report"),
+        "json": scientific.get("summary_file"),
+        "gif": metadata.get("gif"),
+        "offline_demo": bool(metadata.get("demo_mode")),
+    }
+    history_file = Path(output_root) / "history.json"
+    with _history_lock:
+        entries = read_history(output_root)
+        entries.insert(0, entry)
+        temporary = history_file.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(entries[:100], indent=2), encoding="utf-8"
+        )
+        temporary.replace(history_file)
+
+
+def load_precomputed_demo(output_root, size, sigma_threshold):
+    """Return the stable presentation result when its settings match."""
+    if size != DEMO_SIZE or sigma_threshold != DEMO_SIGMA_THRESHOLD:
+        return None
+    cache_file = Path(output_root) / DEMO_JOB_ID / "demo_result.json"
+    if not cache_file.is_file():
+        return None
+    try:
+        payload = json.loads(cache_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if payload.get("cache_version") != DEMO_CACHE_VERSION:
+        return None
+    return payload.get("metadata")
+
+
+def store_precomputed_demo(output_root, source_dir, metadata):
+    """Save one reusable copy of the default offline presentation."""
+    target = Path(output_root) / DEMO_JOB_ID
+    target.mkdir(parents=True, exist_ok=True)
+    for source in Path(source_dir).iterdir():
+        if source.is_file():
+            shutil.copy2(source, target / source.name)
+    payload = {"cache_version": DEMO_CACHE_VERSION, "metadata": metadata}
+    (target / "demo_result.json").write_text(
+        json.dumps(payload, indent=2), encoding="utf-8"
+    )
 
 
 def local_demo_observations():
@@ -99,18 +185,10 @@ def cached_observation_search(ra, dec, band, from_date=None, to_date=None):
         cached = _search_cache.get(key)
         if cached and now - cached[0] < SEARCH_CACHE_TTL:
             return cached[1], True, cached[2]
-    source = "live IRSA"
-    try:
-        observations = search_observations(
-            ra, dec, band, start_mjd=start_mjd, end_mjd=end_mjd
-        )
-    except ArchiveError:
-        observations = search_local_catalog(
-            ra, dec, band, start_mjd=start_mjd, end_mjd=end_mjd
-        )
-        if not observations:
-            raise
-        source = "local catalog fallback"
+    source = "live IRSA TAP"
+    observations = search_observations(
+        ra, dec, band, start_mjd=start_mjd, end_mjd=end_mjd
+    )
     with _search_cache_lock:
         _search_cache[key] = (now, observations, source)
     return observations, False, source
@@ -228,15 +306,21 @@ def create_app(test_config=None):
             ra = float(request.args["ra"])
             dec = float(request.args["dec"])
             band = request.args.get("band", "SPHEREx-D5")
+            demo_mode = request.args.get("demo") == "1"
             from_date = request.args.get("from_date", "")
             to_date = request.args.get("to_date", "")
             if bool(from_date) != bool(to_date):
                 raise ValueError("Choose both From and To, or leave both empty for all data.")
             if from_date and from_date > to_date:
                 raise ValueError("Choose a valid From/To date period.")
-            observations, cache_hit, source = cached_observation_search(
-                ra, dec, band, from_date, to_date
-            )
+            if demo_mode:
+                observations, cache_hit, source = (
+                    local_demo_observations(), True, "local demo files"
+                )
+            else:
+                observations, cache_hit, source = cached_observation_search(
+                    ra, dec, band, from_date, to_date
+                )
         except (KeyError, TypeError, ValueError) as exc:
             return jsonify(error=str(exc) or "Invalid archive search."), 400
         except ArchiveError as exc:
@@ -252,6 +336,23 @@ def create_app(test_config=None):
             source=source,
         )
 
+    @app.get("/api/history")
+    def history_api():
+        entries = []
+        for stored in read_history(app.config["OUTPUT_ROOT"]):
+            job_id = stored.get("job_id", "")
+            if len(job_id) != 32 or any(c not in "0123456789abcdef" for c in job_id):
+                continue
+            entry = dict(stored)
+            for key in ("pdf", "json", "gif"):
+                filename = entry.get(key)
+                entry[f"{key}_url"] = (
+                    url_for("output_file", job_id=job_id, filename=filename)
+                    if filename else None
+                )
+            entries.append(entry)
+        return jsonify(entries=entries, count=len(entries))
+
     @app.post("/generate")
     def generate():
         values = {
@@ -265,12 +366,16 @@ def create_app(test_config=None):
             "from_date": request.form.get("from_date", "").strip(),
             "to_date": request.form.get("to_date", "").strip(),
             "sigma_threshold": request.form.get("sigma_threshold", "5").strip(),
+            "demo_mode": request.form.get("demo_mode", "").strip(),
         }
 
         try:
             ra = float(values["ra"])
             dec = float(values["dec"])
-            demo_mode = ra == DEMO_SENTINEL and dec == DEMO_SENTINEL
+            demo_mode = (
+                values["demo_mode"] == "1"
+                or (ra == DEMO_SENTINEL and dec == DEMO_SENTINEL)
+            )
             effective_ra = DEMO_RA if demo_mode else ra
             effective_dec = DEMO_DEC if demo_mode else dec
             if demo_mode:
@@ -288,9 +393,14 @@ def create_app(test_config=None):
             ), 400
 
         try:
-            available, search_cache_hit, search_source = cached_observation_search(
-                ra, dec, values["band"], values["from_date"], values["to_date"]
-            )
+            if demo_mode:
+                available, search_cache_hit, search_source = (
+                    local_demo_observations(), True, "local demo files"
+                )
+            else:
+                available, search_cache_hit, search_source = cached_observation_search(
+                    ra, dec, values["band"], values["from_date"], values["to_date"]
+                )
             if not available:
                 raise RuntimeError("No current IRSA observations cover this position and band.")
             start_id = values["start_id"] or available[0]["id"]
@@ -304,6 +414,25 @@ def create_app(test_config=None):
                 [by_id[start_id], by_id[end_id]],
                 key=lambda item: item["mjd"],
             )
+            if demo_mode:
+                cached_demo = load_precomputed_demo(
+                    app.config["OUTPUT_ROOT"], size, sigma_threshold
+                )
+                if cached_demo:
+                    cached_demo["demo_cache_hit"] = True
+                    try:
+                        record_history(
+                            app.config["OUTPUT_ROOT"], DEMO_JOB_ID, cached_demo
+                        )
+                    except (OSError, TypeError, ValueError):
+                        app.logger.exception("Analysis history could not be updated")
+                    return render_template(
+                        "index.html",
+                        values=values,
+                        bands=BANDS,
+                        result=cached_demo,
+                        job_id=DEMO_JOB_ID,
+                    )
             job_id = uuid4().hex
             job_dir = Path(app.config["OUTPUT_ROOT"]) / job_id
             def fetch_cutout(observation):
@@ -378,6 +507,38 @@ def create_app(test_config=None):
                 )
             metadata["scientific"] = scientific
             metadata["terminal_output"] = terminal_buffer.getvalue()
+            data_url = url_for(
+                "output_file",
+                job_id=job_id,
+                filename=scientific["summary_file"],
+                _external=True,
+            )
+            try:
+                metadata["pdf_report"] = generate_pdf_report(
+                    metadata,
+                    job_dir,
+                    page_url=request.url_root,
+                    data_url=data_url,
+                )
+            except Exception:
+                app.logger.exception("PDF report generation failed")
+                metadata["pdf_report"] = None
+            metadata["demo_cache_hit"] = False
+            if (
+                demo_mode
+                and size == DEMO_SIZE
+                and sigma_threshold == DEMO_SIGMA_THRESHOLD
+            ):
+                try:
+                    store_precomputed_demo(
+                        app.config["OUTPUT_ROOT"], job_dir, metadata
+                    )
+                except (OSError, TypeError, ValueError):
+                    app.logger.exception("Offline demo cache could not be saved")
+            try:
+                record_history(app.config["OUTPUT_ROOT"], job_id, metadata)
+            except (OSError, TypeError, ValueError):
+                app.logger.exception("Analysis history could not be updated")
         except ValueError as exc:
             return render_template(
                 "index.html", values=values, bands=BANDS, error=str(exc)

@@ -5,15 +5,17 @@ import hashlib
 import io
 import math
 from pathlib import Path
+import re
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from astropy.time import Time
 
 
 TAP_URL = "https://irsa.ipac.caltech.edu/TAP/sync"
+SIA_URL = "https://irsa.ipac.caltech.edu/SIA"
 IRSA_BASE_URL = "https://irsa.ipac.caltech.edu/"
 BANDS = tuple(f"SPHEREx-D{number}" for number in range(1, 7))
 MAX_RESULTS = 5000
@@ -30,6 +32,35 @@ class ArchiveError(RuntimeError):
     pass
 
 
+def _request_text(url, *, payload=None, timeout=None, max_attempts=1, service="IRSA"):
+    """Read a small IRSA response with bounded retries for transient failures."""
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            request = Request(
+                url,
+                data=payload,
+                headers={
+                    "User-Agent": "NasaPlanetX/1.0 (SPHEREx hackathon viewer)",
+                    "Accept": "text/csv, text/plain, */*",
+                },
+            )
+            with urlopen(request, timeout=timeout) as response:
+                return response.read().decode("utf-8-sig")
+        except HTTPError as exc:
+            last_error = exc
+            retryable = exc.code == 429 or 500 <= exc.code < 600
+            if not retryable or attempt == max_attempts:
+                break
+        except (TimeoutError, URLError, ConnectionError) as exc:
+            last_error = exc
+            if attempt == max_attempts:
+                break
+        if attempt < max_attempts:
+            time.sleep(min(4, 2 ** attempt))
+    raise ArchiveError(f"{service} search failed: {last_error}") from last_error
+
+
 def _validate_position(ra, dec):
     ra = float(ra)
     dec = float(dec)
@@ -42,7 +73,8 @@ def search_observations(
     ra,
     dec,
     band="SPHEREx-D5",
-    timeout=90,
+    timeout=None,
+    max_attempts=1,
     start_mjd=None,
     end_mjd=None,
 ):
@@ -80,12 +112,13 @@ def search_observations(
         "QUERY": query,
     }).encode("utf-8")
 
-    try:
-        request = Request(TAP_URL, data=payload, headers={"User-Agent": "NasaPlanetX/1.0"})
-        with urlopen(request, timeout=timeout) as response:
-            text = response.read().decode("utf-8")
-    except Exception as exc:
-        raise ArchiveError(f"IRSA observation search failed: {exc}") from exc
+    text = _request_text(
+        TAP_URL,
+        payload=payload,
+        timeout=timeout,
+        max_attempts=max_attempts,
+        service="IRSA TAP",
+    )
 
     rows = []
     for row in csv.DictReader(io.StringIO(text)):
@@ -111,6 +144,88 @@ def search_observations(
     unique = {}
     for row in rows:
         unique[(row["uri"], row["mjd"])] = row
+    return sorted(unique.values(), key=lambda item: item["mjd"])
+
+
+def _spherex_uri(access_url):
+    """Normalize an absolute or relative SIA access URL to an IRSA data URI."""
+    access_url = str(access_url or "").strip()
+    if not access_url:
+        return ""
+    parsed = urlparse(access_url)
+    uri = parsed.path.lstrip("/") if parsed.scheme else access_url.lstrip("/")
+    return uri if uri.startswith("ibe/data/spherex/") else ""
+
+
+def _spherex_band(row):
+    value = str(row.get("energy_bandpassname") or row.get("band") or "").strip()
+    if value in BANDS:
+        return value
+    filename = Path(_spherex_uri(row.get("access_url"))).name
+    match = re.search(r"_[123]D([1-6])_", filename)
+    return f"SPHEREx-D{match.group(1)}" if match else ""
+
+
+def search_sia_observations(
+    ra,
+    dec,
+    band="SPHEREx-D5",
+    timeout=25,
+    start_mjd=None,
+    end_mjd=None,
+):
+    """Search the official SIA2 image service when the TAP service fails."""
+    ra, dec = _validate_position(ra, dec)
+    if band not in BANDS:
+        raise ValueError(f"Unsupported SPHEREx band: {band}")
+
+    parameters = [("COLLECTION", collection) for collection in CURRENT_COLLECTIONS]
+    parameters.extend([
+        ("POS", f"CIRCLE {ra:.9f} {dec:.9f} 0.0001"),
+        ("DPTYPE", "image"),
+        ("RESPONSEFORMAT", "CSV"),
+        ("MAXREC", str(MAX_RESULTS)),
+    ])
+    if start_mjd is not None or end_mjd is not None:
+        low = float(start_mjd) if start_mjd is not None else "-Inf"
+        high = float(end_mjd) if end_mjd is not None else "+Inf"
+        parameters.append(("TIME", f"{low} {high}"))
+
+    url = f"{SIA_URL}?{urlencode(parameters)}"
+    text = _request_text(url, timeout=timeout, service="IRSA SIA2")
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames or "access_url" not in reader.fieldnames:
+        raise ArchiveError("IRSA SIA2 returned an unexpected response.")
+
+    rows = []
+    for row in reader:
+        if _spherex_band(row) != band:
+            continue
+        try:
+            mjd = float(row["t_min"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        # Apply strict local bounds as SIA TIME uses interval-overlap semantics.
+        if start_mjd is not None and mjd < float(start_mjd):
+            continue
+        if end_mjd is not None and mjd >= float(end_mjd):
+            continue
+        uri = _spherex_uri(row.get("access_url"))
+        if not uri:
+            continue
+        collection = row.get("obs_collection") or row.get("collection") or ""
+        rows.append({
+            "id": hashlib.sha256(uri.encode()).hexdigest()[:16],
+            "uri": uri,
+            "mjd": mjd,
+            "date": Time(mjd, format="mjd").isot,
+            "band": band,
+            "version": row.get("provenance_version") or "SIA2",
+            "collection": collection,
+            "filename": Path(uri).name,
+        })
+
+    unique = {(row["uri"], row["mjd"]): row for row in rows}
     return sorted(unique.values(), key=lambda item: item["mjd"])
 
 

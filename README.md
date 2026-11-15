@@ -14,9 +14,11 @@ This project was built as a focused hackathon prototype. A user can select a pos
 - Supports quick date periods and custom From/To dates.
 - Downloads and processes only the two observations explicitly selected by the user.
 - Creates aligned observation frames, a comparison view, and an animated GIF.
-- Continues to work with a local catalogue fallback when live IRSA search is unavailable.
+- Uses the live IRSA TAP service directly for released observation searches.
 - Includes an offline demonstration using two downloaded D5 FITS files.
 - Presents scientific results in both plain language and an expandable technical view.
+- Exports each completed comparison as a styled PDF report and machine-readable JSON data.
+- Keeps a local header history with execution time and direct PDF, JSON, and GIF downloads.
 - Uses an accessible, high-contrast interface with keyboard focus indicators, screen-reader status messages, large controls, and reduced-motion support.
 
 ## Scientific comparison
@@ -73,7 +75,7 @@ Browser UI
           ▼
 Flask web application
    │
-   ├── IRSA live search ──► local catalogue fallback
+   ├── IRSA TAP observation search
    ├── cached FITS cutout downloads
    └── per-request output directory
           │
@@ -103,6 +105,7 @@ NasaPlanetX/
 │   ├── spectral_matching.py    # Wavelength-map generation
 │   ├── image_comparison.py     # WCS-aligned image comparison
 │   ├── scientific_comparison.py# End-to-end scientific web analysis
+│   ├── pdf_report.py           # Downloadable scientific PDF report
 │   ├── psf_analysis.py         # Point-source width measurement
 │   ├── psf_matching.py         # Resolution matching
 │   ├── candidate_detection.py  # Local residual detection
@@ -165,26 +168,26 @@ If a port is already in use, choose a different value rather than starting a sec
 6. Set the candidate threshold; `5σ` is the default conservative starting point.
 7. Select **Generate time-lapse**.
 8. Review the two frames, brightness-change map, reliability label, and candidate details.
+9. Download the complete PDF report or the underlying scientific JSON data.
 
 Dates are displayed in `DD/MM/YYYY` format in the interface.
+The PDF includes the selected observations, coordinates, measurements, plots, candidates,
+scientific limitations, and a clickable link back to the running web application.
 
 ## Offline demo
 
-To run the application without a successful live IRSA request, enter:
-
-```text
-RA:  999999
-Dec: 999999
-```
-
-Then select **Find current data**. The application will use the two local D5 FITS files and the real target centre:
+To run the application without a successful live IRSA request, use the
+**Offline demo** button next to **Find current data**.
+It automatically selects the two local D5 FITS files, fills in the real target centre,
+and uses the saved default analysis for an immediate presentation result:
 
 ```text
 RA:  133.805°
 Dec: −8.770°
 ```
 
-This sentinel is intended only for local demonstration and development.
+Entering `999999` in both coordinate fields remains available only for compatibility
+with older local demonstrations.
 
 ## Command-line cutout generator
 
@@ -203,7 +206,7 @@ Accepted ranges:
 
 ## Archive and caching behaviour
 
-- Live searches use the NASA/IPAC IRSA TAP service.
+- Live searches use NASA/IPAC IRSA TAP directly. The client does not impose a search timeout or switch to another discovery API.
 - Search results are kept in memory for ten minutes.
 - FITS cutouts are cached under `data/cache/spherex_cutouts/`.
 - Repeating the same request can reuse the existing cached cutout.
