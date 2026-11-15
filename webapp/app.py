@@ -87,6 +87,13 @@ def read_history(output_root):
     return entries if isinstance(entries, list) else []
 
 
+def write_history(output_root, entries):
+    history_file = Path(output_root) / "history.json"
+    temporary = history_file.with_suffix(".tmp")
+    temporary.write_text(json.dumps(entries[:100], indent=2), encoding="utf-8")
+    temporary.replace(history_file)
+
+
 def record_history(output_root, job_id, metadata):
     """Keep a local index of completed comparisons and their exports."""
     observations = metadata.get("observations") or []
@@ -105,15 +112,10 @@ def record_history(output_root, job_id, metadata):
         "gif": metadata.get("gif"),
         "offline_demo": bool(metadata.get("demo_mode")),
     }
-    history_file = Path(output_root) / "history.json"
     with _history_lock:
         entries = read_history(output_root)
         entries.insert(0, entry)
-        temporary = history_file.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(entries[:100], indent=2), encoding="utf-8"
-        )
-        temporary.replace(history_file)
+        write_history(output_root, entries)
 
 
 def load_precomputed_demo(output_root, size, sigma_threshold):
@@ -352,6 +354,33 @@ def create_app(test_config=None):
                 )
             entries.append(entry)
         return jsonify(entries=entries, count=len(entries))
+
+    @app.route("/api/history/<entry_id>", methods=["PATCH", "DELETE"])
+    def history_entry_api(entry_id):
+        if len(entry_id) != 32 or any(c not in "0123456789abcdef" for c in entry_id):
+            abort(404)
+        with _history_lock:
+            entries = read_history(app.config["OUTPUT_ROOT"])
+            matching = next(
+                (entry for entry in entries if entry.get("id") == entry_id), None
+            )
+            if matching is None:
+                abort(404)
+            if request.method == "DELETE":
+                write_history(
+                    app.config["OUTPUT_ROOT"],
+                    [entry for entry in entries if entry.get("id") != entry_id],
+                )
+                return jsonify(deleted=True, id=entry_id)
+            payload = request.get_json(silent=True) or {}
+            name = str(payload.get("name", "")).strip()
+            if not name:
+                return jsonify(error="Enter a name for this analysis."), 400
+            if len(name) > 80:
+                return jsonify(error="The name must be 80 characters or fewer."), 400
+            matching["name"] = name
+            write_history(app.config["OUTPUT_ROOT"], entries)
+        return jsonify(updated=True, id=entry_id, name=name)
 
     @app.post("/generate")
     def generate():

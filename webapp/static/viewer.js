@@ -78,6 +78,8 @@ const historyList = document.querySelector("[data-history-list]");
 const historyClose = document.querySelector("[data-history-close]");
 
 if (historyButton && historyDialog && historyList) {
+  let currentHistory = [];
+
   function historyDate(value) {
     if (!value) return "Unknown date";
     return new Intl.DateTimeFormat("el-GR", {
@@ -102,6 +104,7 @@ if (historyButton && historyDialog && historyList) {
   }
 
   function renderHistory(entries) {
+    currentHistory = entries;
     historyList.replaceChildren();
     if (!entries.length) {
       const empty = document.createElement("p");
@@ -116,7 +119,7 @@ if (historyButton && historyDialog && historyList) {
       const heading = document.createElement("div");
       heading.className = "history-card-heading";
       const title = document.createElement("strong");
-      title.textContent = entry.offline_demo ? "Offline demo" : (entry.band || "SPHEREx analysis");
+      title.textContent = entry.name || (entry.offline_demo ? "Offline demo" : (entry.band || "SPHEREx analysis"));
       const runTime = document.createElement("time");
       runTime.dateTime = entry.created_at;
       runTime.textContent = historyDate(entry.created_at);
@@ -134,6 +137,44 @@ if (historyButton && historyDialog && historyList) {
         downloadLink("JSON", entry.json_url),
         downloadLink("GIF", entry.gif_url),
       ].filter(Boolean).forEach((link) => actions.append(link));
+      const renameButton = document.createElement("button");
+      renameButton.type = "button";
+      renameButton.className = "secondary history-manage";
+      renameButton.textContent = "Rename";
+      renameButton.addEventListener("click", async () => {
+        const defaultName = entry.name || (entry.offline_demo ? "Offline demo" : (entry.band || "SPHEREx analysis"));
+        const name = window.prompt("Choose a name for this analysis:", defaultName)?.trim();
+        if (!name || name === defaultName) return;
+        try {
+          const response = await fetch(`${historyButton.dataset.historyUrl}/${entry.id}`, {
+            method: "PATCH",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name}),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "The name could not be changed.");
+          entry.name = data.name;
+          renderHistory(currentHistory);
+        } catch (error) {
+          window.alert(error.message);
+        }
+      });
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "history-manage history-delete";
+      deleteButton.textContent = "Delete";
+      deleteButton.addEventListener("click", async () => {
+        if (!window.confirm("Remove this entry from history? The PDF, JSON and GIF files will be kept.")) return;
+        try {
+          const response = await fetch(`${historyButton.dataset.historyUrl}/${entry.id}`, {method: "DELETE"});
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "The history entry could not be deleted.");
+          renderHistory(currentHistory.filter((item) => item.id !== entry.id));
+        } catch (error) {
+          window.alert(error.message);
+        }
+      });
+      actions.append(renameButton, deleteButton);
       card.append(heading, details, actions);
       historyList.append(card);
     });

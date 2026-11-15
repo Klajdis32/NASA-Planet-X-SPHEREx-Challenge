@@ -285,6 +285,9 @@ body { overflow-x: hidden; }
 .history-card p { margin: 8px 0 12px; color: var(--muted); font-size: .9rem; }
 .history-downloads { display: flex; flex-wrap: wrap; gap: 8px; }
 .history-download { min-height: 42px; padding: 9px 14px; font-size: .84rem; }
+.history-manage { min-height: 42px; padding: 9px 14px; font-size: .84rem; }
+.history-delete { margin-left: auto; border-color: #d96a78; background: #501c27; color: #fff; }
+.history-delete:hover { border-color: #ff9ba6; background: #712635; color: #fff; }
 .history-empty { padding: 24px; text-align: center; color: var(--muted); border: 2px dashed var(--border); border-radius: 11px; }
 
 .sky-picker { position: relative; width: 100%; height: min(72svh, 760px); min-height: 520px; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; box-shadow: none; background: #010509; }

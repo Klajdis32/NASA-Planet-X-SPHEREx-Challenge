@@ -18,7 +18,8 @@ This project was built as a focused hackathon prototype. A user can select a pos
 - Includes an offline demonstration using two downloaded D5 FITS files.
 - Presents scientific results in both plain language and an expandable technical view.
 - Exports each completed comparison as a styled PDF report and machine-readable JSON data.
-- Keeps a local header history with execution time and direct PDF, JSON, and GIF downloads.
+- Keeps a local header history with execution time, editable names, removable entries,
+  and direct PDF, JSON, and GIF downloads.
 - Uses an accessible, high-contrast interface with keyboard focus indicators, screen-reader status messages, large controls, and reduced-motion support.
 
 ## Scientific comparison
